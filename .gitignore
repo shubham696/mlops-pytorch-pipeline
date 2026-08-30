@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Data & model artifacts
+data/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Env / secrets
+.env
+*.env
+secrets/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git worktrees used for parallel feature development
+.worktrees/
