@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+
+# ---- Stage 1: builder ----
+# Installs inference-only dependencies (flask, torch, torchvision, numpy,
+# pillow, gunicorn) into a user-local prefix so the final stage can copy
+# just the installed packages, without pip/build caches.
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+COPY requirements/serve.txt ./requirements/serve.txt
+RUN pip install --no-cache-dir --user -r requirements/serve.txt
+
+# ---- Stage 2: final ----
+FROM python:3.11-slim AS final
+
+# Create an unprivileged user to run the service as.
+RUN useradd --create-home --shell /usr/sbin/nologin --uid 1000 appuser
+
+WORKDIR /app
+
+# Bring in only the installed site-packages from the builder stage.
+COPY --from=builder /root/.local /home/appuser/.local
+COPY src/ ./src/
+
+# /app/checkpoints is expected to be mounted read-only at `docker run` time.
+RUN mkdir -p /app/checkpoints \
+    && chown -R appuser:appuser /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PATH="/home/appuser/.local/bin:${PATH}" \
+    PYTHONPATH="/home/appuser/.local/lib/python3.11/site-packages"
+
+USER appuser
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health', timeout=3).status == 200 else 1)"
+
+# gunicorn is preferred for production-style serving; src/serve.py exposes
+# a module-level Flask `app` object compatible with this entrypoint.
+CMD ["gunicorn", "src.serve:app", "-b", "0.0.0.0:8080"]

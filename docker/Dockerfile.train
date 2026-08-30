@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+
+# ---- Stage 1: base ----
+# Installs training dependencies (torch, torchvision, pyyaml, numpy) once,
+# so the training stage can be rebuilt quickly without reinstalling deps.
+FROM python:3.11-slim AS base
+
+WORKDIR /app
+
+COPY requirements/train.txt ./requirements/train.txt
+RUN pip install --no-cache-dir -r requirements/train.txt
+
+# ---- Stage 2: training ----
+FROM base AS training
+
+WORKDIR /app
+
+COPY src/ ./src/
+COPY configs/ ./configs/
+
+ENV PYTHONUNBUFFERED=1
+
+# /app/data and /app/checkpoints are expected to be mounted as volumes at
+# `docker run` time; they are intentionally not created/copied here.
+ENTRYPOINT ["python", "src/train.py"]
